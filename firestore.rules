@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(data) {
+      return isSignedIn() && data.creatorId == request.auth.uid;
+    }
+
+    function isValidScript(data) {
+      return data.creatorId is string && data.creatorId.size() <= 128
+        && data.luaCode is string && data.luaCode.size() <= 1000000
+        && data.codeId is string && data.codeId.size() <= 64
+        && data.views is number
+        && data.createdAt is timestamp
+        && data.title is string && data.title.size() <= 256;
+    }
+
+    match /scripts/{scriptId} {
+      // Browsers and Roblox can read individual scripts if they have the ID
+      allow get: if true;
+      
+      // Enforce query safety for listing
+      allow list: if isSignedIn() && resource.data.creatorId == request.auth.uid;
+
+      allow create: if isSignedIn() 
+        && incoming().creatorId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().views == 0
+        && isValidScript(incoming());
+
+      allow update: if isSignedIn() && isOwner(existing())
+        && incoming().creatorId == existing().creatorId
+        && incoming().createdAt == existing().createdAt
+        && (
+          // Action: Update title
+          (incoming().diff(existing()).affectedKeys().hasOnly(['title'])) ||
+          // Action: Track views (Handled by Admin SDK usually, but allowed if client manages)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['views']))
+        );
+        
+      allow delete: if isSignedIn() && isOwner(existing());
+    }
+  }
+}

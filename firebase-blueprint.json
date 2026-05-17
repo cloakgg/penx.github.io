@@ -1,0 +1,24 @@
+{
+  "entities": {
+    "Script": {
+      "title": "Script",
+      "description": "Stored obfuscated Lua scripts and their metadata.",
+      "type": "object",
+      "properties": {
+        "creatorId": { "type": "string", "description": "UID of the user who created the script." },
+        "title": { "type": "string", "description": "Display title for the link." },
+        "luaCode": { "type": "string", "description": "The raw/obfuscated Lua code." },
+        "codeId": { "type": "string", "description": "The 16-digit access code." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "views": { "type": "number" }
+      },
+      "required": ["creatorId", "luaCode", "codeId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/scripts/{scriptId}": {
+      "schema": "Script",
+      "description": "Collection of scripts accessible via unique codes."
+    }
+  }
+}

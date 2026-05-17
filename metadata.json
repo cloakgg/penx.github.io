@@ -1,0 +1,6 @@
+{
+  "name": "PenX",
+  "description": "A robust Roblox Lua script obfuscation and delivery platform with integrated key system and browser-to-Lua detection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
