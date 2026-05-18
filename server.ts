@@ -74,7 +74,6 @@ async function startServer() {
         res.redirect(`/?script=${codeId}`);
       }
     } catch (error) {
-      console.error("Fetch error:", error);
       res.status(500).send("-- PenX Error: Internal Server Error");
     }
   });
@@ -100,7 +99,6 @@ async function startServer() {
       });
       res.json({ code: response.text });
     } catch (error) {
-      console.error("Generation error:", error);
       res.status(500).json({ error: "Failed to generate script" });
     }
   });
