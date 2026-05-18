@@ -40,24 +40,24 @@ service cloud.firestore {
       // Public access to fetch a script
       allow get: if true;
       
-      // Allow listing scripts created by the same device identifier
-      allow list: if resource.data.creatorId is string;
+      // Enforce query safety for listing
+      allow list: if isSignedIn() && resource.data.creatorId == request.auth.uid;
 
-      // Allow creating scripts with a persistent device identifier
-      allow create: if incoming().creatorId is string
+      allow create: if isSignedIn() 
+        && incoming().creatorId == request.auth.uid
         && incoming().createdAt == request.time
         && incoming().views == 0
         && isValidScript(incoming());
 
-      // Allow updates to views or titles if creatorId matches
-      allow update: if existing().creatorId == incoming().creatorId
+      allow update: if isOwner(existing())
+        && incoming().creatorId == existing().creatorId
         && incoming().createdAt == existing().createdAt
         && (
           incoming().diff(existing()).affectedKeys().hasOnly(['title']) ||
           incoming().diff(existing()).affectedKeys().hasOnly(['views'])
         );
         
-      allow delete: if false; // Prevention of accidental loss
+      allow delete: if isOwner(existing());
     }
   }
 }

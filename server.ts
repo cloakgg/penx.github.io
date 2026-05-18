@@ -91,7 +91,7 @@ async function startServer() {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
           systemInstruction: "You are an expert Roblox Lua developer. Generate high-quality, efficient, and clean Roblox Lua script based on the user's prompt. ONLY output the code, no markdown or explanations.",

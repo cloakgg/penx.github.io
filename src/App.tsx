@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { 
+  onAuthStateChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  User
+} from "firebase/auth";
+import { 
   collection, 
   addDoc, 
   query, 
@@ -12,11 +19,11 @@ import {
   increment,
   onSnapshot
 } from "firebase/firestore";
-import { db } from "@/src/lib/firebase";
+import { auth, db } from "@/src/lib/firebase";
 import { PromptInputBox } from "@/src/components/PromptInputBox";
 import { Button } from "@/src/components/ui/button";
 import { LiquidButton } from "@/src/components/ui/LiquidButton";
-import { Shield, Code, Zap, ExternalLink, Copy, Check, Terminal, BrainCircuit, Sparkles } from "lucide-react";
+import { Shield, Code, Zap, ExternalLink, Copy, Check, Terminal, BrainCircuit, Sparkles, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { Plan } from "@/src/components/Plan";
@@ -55,6 +62,7 @@ const getDeviceId = () => {
 };
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [viewScript, setViewScript] = useState<string | null>(null);
@@ -62,15 +70,36 @@ export default function App() {
   const [copied, setCopied] = useState<string | null>(null);
   const [mode, setMode] = useState<"obfuscate" | "generate">("obfuscate");
 
-  const deviceId = getDeviceId();
-
   useEffect(() => {
-    fetchUserLinks(deviceId);
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (u) {
+        fetchUserLinks(u.uid);
+      } else {
+        setCreatedLinks([]);
+      }
+      setLoading(false);
+    });
+
     const params = new URLSearchParams(window.location.search);
     const scriptId = params.get("script");
     if (scriptId) setViewScript(scriptId);
-    setLoading(false);
+
+    return () => unsubscribe();
   }, []);
+
+  const login = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      if (err.code === "auth/unauthorized-domain") {
+        alert("Authorized Domain Needed!\n\nPlease add 'www.penx.fun' to Authorized Domains in Firebase Console > Authentication > Settings.");
+      } else {
+        alert("Login failed: " + err.message);
+      }
+    }
+  };
 
   const fetchUserLinks = async (id: string) => {
     const path = "scripts";
@@ -80,11 +109,12 @@ export default function App() {
       const links = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCreatedLinks(links);
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, path);
+      console.error("Fetch failed", error);
     }
   };
 
   const handleAction = async (input: string) => {
+    if (!user) return login();
     setIsProcessing(true);
     const path = "scripts";
     try {
@@ -122,7 +152,7 @@ export default function App() {
       const codeId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
       
       await addDoc(collection(db, path), {
-        creatorId: deviceId,
+        creatorId: user.uid,
         title: title,
         luaCode: finalCode,
         codeId: codeId,
@@ -130,7 +160,7 @@ export default function App() {
         views: 0
       });
 
-      fetchUserLinks(deviceId);
+      fetchUserLinks(user.uid);
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, path);
     } finally {
@@ -172,18 +202,38 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-50">
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        <header className="flex justify-between items-center mb-16">
-          <div className="flex items-center gap-3">
-             <div className="bg-blue-600 p-2 rounded-lg text-white">
-                <Shield className="w-6 h-6" />
-             </div>
-             <h1 className="text-2xl font-bold tracking-tight">PenX Dashboard</h1>
-          </div>
-          <div className="text-[10px] font-mono text-neutral-400 opacity-50 uppercase tracking-widest hidden sm:block">
-            ACTIVE SESSION: {deviceId.substring(0, 8)}...
-          </div>
-        </header>
+      {!user ? (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+          <Shield className="w-20 h-20 text-blue-600 mb-8" />
+          <h1 className="text-4xl font-bold mb-4 font-mono tracking-tighter uppercase italic">PenX Protocl</h1>
+          <p className="text-neutral-500 max-w-sm mb-10 leading-relaxed">
+            Ultimate script delivery and creation platform. Secure, fast, and AI-powered.
+          </p>
+          <LiquidButton onClick={login}>
+            Authenticate with Google
+          </LiquidButton>
+          <p className="mt-8 text-[10px] text-neutral-400 font-mono italic opacity-50">
+            SECURE ACCESS REQUIRED • BYPASS ATTEMPT DETECTED
+          </p>
+        </div>
+      ) : (
+        <div className="max-w-6xl mx-auto px-6 py-12">
+          <header className="flex justify-between items-center mb-16">
+            <div className="flex items-center gap-3">
+               <div className="bg-blue-600 p-2 rounded-lg text-white font-black italic">
+                  PX
+               </div>
+               <h1 className="text-2xl font-black tracking-tighter italic uppercase">PenX</h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-[10px] font-mono text-neutral-400 opacity-50 uppercase tracking-widest hidden sm:block">
+                {user.email}
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => signOut(auth)}>
+                <LogOut className="w-5 h-5" />
+              </Button>
+            </div>
+          </header>
 
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-12">
@@ -299,7 +349,7 @@ export default function App() {
                 <ul className="text-xs text-blue-800 dark:text-blue-300 space-y-3 opacity-80">
                   <li className="flex items-start gap-2">
                     <div className="bg-blue-400 w-1 h-1 rounded-full mt-1.5" />
-                    Advanced Lua via Gemini 3.1 Pro.
+                    Advanced Lua via Gemini 3 AI.
                   </li>
                   <li className="flex items-start gap-2">
                     <div className="bg-blue-400 w-1 h-1 rounded-full mt-1.5" />
@@ -332,6 +382,7 @@ export default function App() {
           </aside>
         </main>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 }
