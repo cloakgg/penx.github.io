@@ -71,12 +71,25 @@ export default function App() {
   const [mode, setMode] = useState<"obfuscate" | "generate">("obfuscate");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    let unsubscribeScripts: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
       if (u) {
-        fetchUserLinks(u.uid);
+        const path = "scripts";
+        const q = query(collection(db, path), where("creatorId", "==", u.uid));
+        unsubscribeScripts = onSnapshot(q, (snapshot) => {
+          const links = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setCreatedLinks(links);
+        }, (error) => {
+          console.error("Scripts snapshot error:", error);
+        });
       } else {
         setCreatedLinks([]);
+        if (unsubscribeScripts) {
+          unsubscribeScripts();
+          unsubscribeScripts = null;
+        }
       }
       setLoading(false);
     });
@@ -85,7 +98,10 @@ export default function App() {
     const scriptId = params.get("script");
     if (scriptId) setViewScript(scriptId);
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeScripts) unsubscribeScripts();
+    };
   }, []);
 
   const login = async () => {
@@ -98,18 +114,6 @@ export default function App() {
       } else {
         alert("Login failed: " + err.message);
       }
-    }
-  };
-
-  const fetchUserLinks = async (id: string) => {
-    const path = "scripts";
-    try {
-      const q = query(collection(db, path), where("creatorId", "==", id));
-      const querySnapshot = await getDocs(q);
-      const links = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCreatedLinks(links);
-    } catch (error) {
-      console.error("Fetch failed", error);
     }
   };
 
@@ -159,8 +163,6 @@ export default function App() {
         createdAt: serverTimestamp(),
         views: 0
       });
-
-      fetchUserLinks(user.uid);
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, path);
     } finally {
@@ -205,7 +207,7 @@ export default function App() {
       {!user ? (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
           <Shield className="w-20 h-20 text-blue-600 mb-8" />
-          <h1 className="text-4xl font-bold mb-4 font-mono tracking-tighter uppercase italic">PenX Protocl</h1>
+          <h1 className="text-4xl font-bold mb-4 font-mono tracking-tighter uppercase italic">PenX Protocol</h1>
           <p className="text-neutral-500 max-w-sm mb-10 leading-relaxed">
             Ultimate script delivery and creation platform. Secure, fast, and AI-powered.
           </p>

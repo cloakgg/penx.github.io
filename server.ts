@@ -90,14 +90,14 @@ async function startServer() {
     if (!prompt) return res.status(400).json({ error: "No prompt provided" });
 
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          systemInstruction: "You are an expert Roblox Lua developer. Generate high-quality, efficient, and clean Roblox Lua script based on the user's prompt. ONLY output the code, no markdown or explanations.",
-        },
+      const model = ai.getGenerativeModel({
+        model: "gemini-2.0-flash-exp", // Using a more stable flash model alias if 3 matches are problematic
+        systemInstruction: "You are an expert Roblox Lua developer. Generate high-quality, efficient, and clean Roblox Lua script based on the user's prompt. ONLY output the code, no markdown or explanations.",
       });
-      res.json({ code: response.text });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      res.json({ code: text });
     } catch (error) {
       res.status(500).json({ error: "Failed to generate script" });
     }
